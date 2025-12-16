@@ -1,136 +1,109 @@
 <?php
-// Include the database connection file
+// history.php
+session_start();
 require 'db_connection.php';
 
-// Assume the user ID is stored in the session after login
-session_start();
+// Protect page
 if (!isset($_SESSION['user_id'])) {
-    header('Location: login.php');
+    header("Location: login.php");
     exit;
 }
 
 $user_id = $_SESSION['user_id'];
+
+// Fetch watch history
+$stmt = $pdo->prepare("
+    SELECT 
+        m.movie_name,
+        m.movie_poster,
+        w.watch_percentage,
+        w.last_watched
+    FROM watch_history w
+    JOIN movies m ON w.movie_id = m.id
+    WHERE w.user_id = :uid
+    ORDER BY w.last_watched DESC
+");
+$stmt->execute(['uid' => $user_id]);
+$history = $stmt->fetchAll();
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Watch History</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css">
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-        }
+<meta charset="UTF-8">
+<title>Watch History - Infinity</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 20px;
-            background-color: #343a40;
-            color: #fff;
-        }
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css">
+<link rel="stylesheet" href="style.css">
 
-        .history-container {
-            padding: 20px;
-        }
-
-        .history-item {
-            display: flex;
-            align-items: center;
-            margin-bottom: 20px;
-            border: 1px solid #ccc;
-            border-radius: 10px;
-            overflow: hidden;
-            background: #fff;
-        }
-
-        .history-item img {
-            width: 150px;
-            height: 100px;
-            object-fit: cover;
-        }
-
-        .history-info {
-            flex-grow: 1;
-            padding: 10px;
-        }
-
-        .history-info h5 {
-            margin: 0;
-        }
-
-        .progress-bar {
-            background-color: #28a745;
-        }
-
-        .footer {
-            background-color: #343a40;
-            color: #fff;
-            padding: 10px;
-            text-align: center;
-            position: fixed;
-            bottom: 0;
-            width: 100%;
-        }
-    </style>
+<style>
+body {
+    background:#121212;
+    color:#fff;
+}
+.history-item {
+    display:flex;
+    gap:15px;
+    background:#1e1e1e;
+    padding:15px;
+    border-radius:10px;
+    margin-bottom:15px;
+}
+.history-item img {
+    width:120px;
+    height:180px;
+    object-fit:cover;
+    border-radius:8px;
+}
+.progress {
+    height: 8px;
+}
+</style>
 </head>
+
 <body>
 
-    <!-- Header -->
-    <div class="header">
-        <div class="logo">Movie Stream</div>
-        <div>
-            <a href="profile.php" class="btn btn-primary">Profile</a>
-            <a href="home.php" class="btn btn-secondary">Home</a>
+<!-- Loader -->
+<div id="loading-screen">
+    <div class="spinner-box">
+        <div class="circle-border">
+            <div class="circle-core"></div>
         </div>
+        <h3>Loading, please wait...</h3>
     </div>
+</div>
 
-    <!-- Watch History -->
-    <div class="history-container">
-        <h2>Your Watch History</h2>
-        <?php
-        // Fetch the user's watch history
-        $sql_history = "
-            SELECT 
-                m.movie_name AS name, 
-                m.movie_poster AS poster, 
-                w.watch_percentage AS watched
-            FROM watch_history w
-            INNER JOIN movies m ON w.movie_id = m.id
-            WHERE w.user_id = $user_id
-            ORDER BY w.last_watched DESC";
+<div class="container mt-4">
+    <h2>Your Watch History</h2>
 
-        $result_history = $conn->query($sql_history);
+    <?php if (count($history) > 0): ?>
+        <?php foreach ($history as $row): ?>
+            <div class="history-item">
+                <img src="<?php echo $row['movie_poster']; ?>"
+                     onerror="this.src='elements/default-poster.png';">
 
-        if ($result_history->num_rows > 0) {
-            while ($row = $result_history->fetch_assoc()) {
-                echo "
-                    <div class='history-item'>
-                        <img src='uploads/{$row['poster']}' alt='{$row['name']}'>
-                        <div class='history-info'>
-                            <h5>{$row['name']}</h5>
-                            <div class='progress'>
-                                <div class='progress-bar' role='progressbar' style='width: {$row['watched']}%;' aria-valuenow='{$row['watched']}' aria-valuemin='0' aria-valuemax='100'></div>
-                            </div>
-                            <p>{$row['watched']}% watched</p>
+                <div class="flex-grow-1">
+                    <h5><?php echo htmlspecialchars($row['movie_name']); ?></h5>
+
+                    <div class="progress mb-2">
+                        <div class="progress-bar bg-success"
+                             style="width: <?php echo $row['watch_percentage']; ?>%">
                         </div>
                     </div>
-                ";
-            }
-        } else {
-            echo "<p>You haven't watched any movies yet!</p>";
-        }
-        ?>
-    </div>
 
-    <!-- Footer -->
-    <div class="footer">
-        &copy; 2024 Movie Stream | All Rights Reserved
-    </div>
+                    <small>
+                        Watched: <?php echo $row['watch_percentage']; ?>% <br>
+                        Last watched: <?php echo $row['last_watched']; ?>
+                    </small>
+                </div>
+            </div>
+        <?php endforeach; ?>
+    <?php else: ?>
+        <p>You haven’t watched any movies yet.</p>
+    <?php endif; ?>
+</div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+<script src="script.js"></script>
 </body>
 </html>
