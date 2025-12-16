@@ -1,215 +1,135 @@
 <?php
-// Include the database connection file
+// home.php
+session_start();
 require 'db_connection.php';
 
-// Search functionality
-$search_query = "";
-if (isset($_GET['search'])) {
-    $search_query = $conn->real_escape_string($_GET['search']);
+// Protect page
+if (!isset($_SESSION['user_id'])) {
+    header("Location: login.php");
+    exit;
 }
 
-// Query for movies
-$sql_movies = "
-    SELECT 
+// Search
+$search = '';
+$params = [];
+
+$sql = "
+    SELECT
         id,
-        movie_name AS name,
-        movie_poster AS poster,
-        movie_genres AS genres,
+        movie_name,
+        movie_poster,
+        movie_genres,
         release_year,
         imdb_rating,
-        language,
-        description
-    FROM movies";
+        language
+    FROM movies
+";
 
-if (!empty($search_query)) {
-    $sql_movies .= " WHERE movie_name LIKE '%$search_query%' OR movie_genres LIKE '%$search_query%'";
+if (!empty($_GET['search'])) {
+    $search = trim($_GET['search']);
+    $sql .= " WHERE movie_name ILIKE :search OR movie_genres ILIKE :search ";
+    $params['search'] = "%$search%";
 }
 
-$sql_movies .= " ORDER BY upload_date DESC LIMIT 20";
+$sql .= " ORDER BY upload_date DESC";
 
-$result_movies = $conn->query($sql_movies);
+// Fetch movies
+$stmt = $pdo->prepare($sql);
+$stmt->execute($params);
+$movies = $stmt->fetchAll();
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Home - Infinity</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css">
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-        }
+<meta charset="UTF-8">
+<title>Home - Infinity</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 20px;
-            background-color: #343a40;
-            color: #fff;
-        }
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css">
+<link rel="stylesheet" href="style.css">
 
-        .logo {
-            font-size: 24px;
-            font-weight: bold;
-        }
-
-        .nav-links {
-            display: flex;
-            gap: 15px;
-            align-items: center;
-        }
-
-        .nav-links a {
-            color: #fff;
-            text-decoration: none;
-            font-size: 16px;
-        }
-
-        .nav-links a:hover {
-            text-decoration: underline;
-        }
-
-        .search-bar {
-            display: flex;
-            gap: 5px;
-            align-items: center;
-        }
-
-        .search-bar input[type="text"] {
-            padding: 5px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-        }
-
-        .search-bar button {
-            padding: 5px 10px;
-            background-color: #007bff;
-            color: #fff;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-
-        .search-bar button:hover {
-            background-color: #0056b3;
-        }
-
-        .movie-grid-container {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 20px;
-            padding: 20px;
-        }
-
-        @media (max-width: 992px) {
-            .movie-grid-container {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
-
-        @media (max-width: 576px) {
-            .movie-grid-container {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        .movie-grid {
-            border: 1px solid #ccc;
-            border-radius: 10px;
-            overflow: hidden;
-            background: #fff;
-            text-align: center;
-            transition: transform 0.3s ease;
-        }
-
-        .movie-grid:hover {
-            transform: scale(1.05);
-        }
-
-        .movie-grid img {
-            width: 100%;
-            height: 300px;
-            object-fit: cover;
-        }
-
-        .movie-info {
-            padding: 10px;
-        }
-
-        .movie-info p {
-            margin: 5px 0;
-        }
-
-        .footer {
-            background-color: #343a40;
-            color: #fff;
-            padding: 10px;
-            text-align: center;
-            position: fixed;
-            bottom: 0;
-            width: 100%;
-        }
-    </style>
+<style>
+body {
+    background:#121212;
+    color:#fff;
+}
+.movie-card img {
+    height:300px;
+    object-fit:cover;
+}
+</style>
 </head>
+
 <body>
-    <!-- Header -->
-    <div class="header">
-        <a href="home.php" class="logo">Infinity</a>
-        <div class="nav-links">
-            <form class="search-bar" method="GET" action="">
-                <input type="text" name="search" placeholder="Search movies..." value="<?php echo htmlspecialchars($search_query); ?>">
-                <button type="submit">Search</button>
-            </form>
-            <a href="home.php">Home</a>
-            <a href="profile.php">Profile</a>
-            <a href="history.php">History</a>
-            <a href="about.php">About</a>
-            <a href="logout.php">Logout</a>
+
+<!-- Loader -->
+<div id="loading-screen">
+    <div class="spinner-box">
+        <div class="circle-border">
+            <div class="circle-core"></div>
         </div>
+        <h3>Loading, please wait...</h3>
     </div>
+</div>
 
-    <!-- Movie Grid -->
-    <div class="movie-grid-container">
-        <?php
-        if ($result_movies->num_rows > 0) {
-            while ($row = $result_movies->fetch_assoc()) {
-                $poster_path = !empty($row['poster']) ? "uploads/posters/" . $row['poster'] : "images/default-poster.png";
-                echo "
-                    <div class='movie-grid'>
-                        <a href='movie.php?id={$row['id']}'>
-                            <img src='$poster_path' alt='{$row['name']}' 
-                                 onerror=\"this.onerror=null;this.src='images/default-poster.png';\">
+<!-- Header -->
+<nav class="navbar navbar-dark bg-dark px-3">
+    <span class="navbar-brand">Infinity</span>
+
+    <form method="GET" class="d-flex">
+        <input class="form-control form-control-sm me-2"
+               type="search"
+               name="search"
+               placeholder="Search movies..."
+               value="<?php echo htmlspecialchars($search); ?>">
+        <button class="btn btn-sm btn-primary">Search</button>
+    </form>
+
+    <div class="ms-auto d-flex gap-3">
+        <a href="home.php" class="text-white text-decoration-none">Home</a>
+        <a href="profile.php" class="text-white text-decoration-none">Profile</a>
+        <a href="history.php" class="text-white text-decoration-none">History</a>
+        <a href="about.php" class="text-white text-decoration-none">About</a>
+        <a href="logout.php" class="text-danger text-decoration-none">Logout</a>
+    </div>
+</nav>
+
+<!-- Movie Grid -->
+<div class="container mt-4">
+    <div class="row g-4">
+
+        <?php if (count($movies) > 0): ?>
+            <?php foreach ($movies as $m): ?>
+                <div class="col-lg-3 col-md-4 col-sm-6">
+                    <div class="card bg-dark text-white movie-card h-100">
+
+                        <a href="movie.php?id=<?php echo $m['id']; ?>">
+                            <img src="<?php echo $m['movie_poster']; ?>"
+                                 class="card-img-top"
+                                 onerror="this.src='elements/default-poster.png';">
                         </a>
-                        <div class='movie-info'>
-                            <p class='movie-name'><strong>{$row['name']}</strong></p>
-                            <p class='movie-genres'>Genre: {$row['genres']}</p>
-                            <p class='movie-year'>Release Year: {$row['release_year']}</p>
-                            <p class='movie-rating'>
-                                <img src='images/imdb.png' alt='IMDb' style='height:20px;'> {$row['imdb_rating']}
-                            </p>
-                            <p class='movie-language'>Language: {$row['language']}</p>
+
+                        <div class="card-body text-center">
+                            <h6><?php echo htmlspecialchars($m['movie_name']); ?></h6>
+                            <small><?php echo $m['movie_genres']; ?></small><br>
+                            <small><?php echo $m['release_year']; ?></small><br>
+                            <img src="elements/logo/imdb.png" style="height:16px;">
+                            <?php echo $m['imdb_rating']; ?>
                         </div>
+
                     </div>
-                ";
-            }
-        } else {
-            echo "
-                <div style='text-align: center; margin-top: 20px;'>
-                    <p>No movies available right now. Please check back later!</p>
                 </div>
-            ";
-        }
-        ?>
-    </div>
+            <?php endforeach; ?>
+        <?php else: ?>
+            <div class="col-12 text-center">
+                <p>No movies found.</p>
+            </div>
+        <?php endif; ?>
 
-    <!-- Footer -->
-    <div class="footer">
-        &copy; 2024 Infinity Entertainment | All Rights Reserved
     </div>
+</div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+<script src="script.js"></script>
 </body>
 </html>
