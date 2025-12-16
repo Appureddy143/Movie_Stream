@@ -1,15 +1,15 @@
 <?php
-// Database connection configuration
-$host = 'localhost';
-$username = 'root';
-$password = ''; // Add your MySQL password if applicable
-$database = 'movie_streaming';
+// db_connection.php (Neon PostgreSQL)
 
-// Create connection
-$conn = new mysqli($host, $username, $password, $database);
+$dsn = getenv('psql 'postgresql://neondb_owner:npg_nfz4ISgq9BcR@ep-odd-meadow-adrtd94e-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require'');
 
-// Check connection
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
+try {
+    $pdo = new PDO($dsn, null, null, [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        PDO::ATTR_EMULATE_PREPARES => false,
+    ]);
+} catch (PDOException $e) {
+    die("Database connection failed");
 }
 ?>
