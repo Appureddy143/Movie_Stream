@@ -1,7 +1,13 @@
 <?php
+patch-1
 // db_connection.php (Neon PostgreSQL + Render compatible)
 
 $dsn = getenv('DATABASE_URL');
+=======
+// db_connection.php (Neon PostgreSQL)
+
+$dsn = getenv('psql 'postgresql://neondb_owner:npg_nfz4ISgq9BcR@ep-odd-meadow-adrtd94e-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require'');
+ main
 
 try {
     $pdo = new PDO($dsn, null, null, [
